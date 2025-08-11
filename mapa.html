@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Mapa pokladu</title>
+  <link rel="stylesheet" href="styl.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map {
+      width: 90%;
+      height: 400px;
+      margin: 30px auto;
+      filter: blur(5px);
+    }
+  </style>
+</head>
+<body>
+  <h1>🗺️ Mapa pokladu</h1>
+  <div id="map"></div>
+  <p>🔍 Víte kde to je?</p>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map("map").setView([49.003, 14.450], 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap",
+    }).addTo(map);
+    L.marker([49.003, 14.450]).addTo(map).bindPopup("Možná tady...");
+  </script>
+</body>
+</html>
