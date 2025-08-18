@@ -1,31 +1,188 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Mapa pokladu</title>
-  <link rel="stylesheet" href="styl.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    #map {
-      width: 90%;
-      height: 400px;
-      margin: 30px auto;
-      filter: blur(5px);
+    html, body { margin:0; padding:0; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+
+    h1 { text-align:center; margin: 20px 0; }
+    .wrap { width: 90%; margin: 0 auto 24px; text-align:center; }
+
+    .map-frame {
+      width: 100%;
+      max-width: 1000px;
+      margin: 0 auto 12px;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 2px solid rgba(0,0,0,0.08);
+    }
+    /* Výchozí rozmazání 100px – jistota, že je obrázek rozostřený hned po načtení */
+    #map-img {
+      display:block;
+      width:100%;
+      height:auto;
+      filter: blur(100px);
+      transition: filter .5s ease;
+      will-change: filter;
+    }
+
+    .under-map { margin: 8px 0 18px; font-size: 1.1rem; }
+
+    .card {
+      width: 100%;
+      max-width: 820px;
+      margin: 0 auto;
+      text-align: left;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(0,0,0,.04);
+    }
+    .q-head { font-weight: 700; margin-bottom: 8px; }
+    .q-text { margin: 0 0 12px 0; line-height: 1.5; }
+    .meta { font-size: .9rem; opacity: .8; margin-bottom: 10px; }
+
+    .row { display: flex; gap: 10px; }
+    .row input[type="text"] {
+      flex: 1 1 auto;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    .row button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #111827;
+      color: #fff;
+    }
+    .status { margin-top: 10px; font-size: .95rem; }
+    .ok { color: #0d9488; }
+    .bad { color: #b91c1c; }
+
+    .controls { margin-top: 10px; text-align: right; }
+    .controls button {
+      background: transparent; border: 0; color: #2563eb; cursor: pointer; text-decoration: underline;
     }
   </style>
 </head>
 <body>
   <h1>🗺️ Mapa pokladu</h1>
-  <div id="map"></div>
-  <p>🔍 Víte kde to je?</p>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <div class="wrap">
+    <div class="map-frame">
+      <img id="map-img" src="map.png" alt="Mapa pokladu (rozostřená)">
+    </div>
+
+    <p class="under-map">🔍 Víte kde to je?</p>
+
+    <div class="card">
+      <div class="q-head" id="q-progress">Otázka</div>
+      <p class="q-text" id="q-text"></p>
+      <div class="meta">Zadej odpověď (bez ohledu na diakritiku a velikost písmen).</div>
+
+      <div class="row">
+        <input id="answer" type="text" placeholder="Napiš odpověď…" autocomplete="off">
+        <button id="send-btn">Odeslat</button>
+      </div>
+      <div class="status" id="status"></div>
+
+      <div class="controls">
+        <button id="reset-btn" title="Začít znovu">Resetovat postup</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    const map = L.map("map").setView([49.003, 14.450], 14);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap",
-    }).addTo(map);
-    L.marker([49.003, 14.450]).addTo(map).bindPopup("Možná tady...");
+    // Hádanky + odpovědi
+    const RIDDLES = [
+      { q: "1. Bez hlasu pláče, bez nehtů štípá, bez nohou skáče, bez pysků pípá.", a: ["vítr","vitr"] },
+      { q: "2. Není ji vidět, není ji cítit, není ji slyšet, nejde ji chytit. Je za hvězdami a pod horami. a vyplňuje prázdné jámy. Byla tu předtím a přijde pak. a nakonec ti vytře zrak.", a: ["tma"] },
+      { q: "3. Všechno žere, všechno se v něm ztrácí, stromy, květy, zvířata i ptáci. Hryže kov i pláty z ocele, tvrdý kámen na prach semele. Města rozvalí a krále skolí, vysokánské hory svrhne do údolí.", a: ["čas","cas"] },
+      { q: "4. Co má město, ale ne domy; les, ale ne stromy; a řeku, ale ne vodu?", a: ["mapa"] },
+      { q: "5. Kořeny má skryté v zemi, vypíná se nad jedlemi, stoupá pořád výš a výš, ale růst ji nevidíš.", a: ["hora"] }
+    ];
+
+    const KEY_IDX  = "treasure_riddle_idx";
+    const KEY_BLUR = "treasure_blur_px";
+    const STEP = 4;
+    const START_BLUR = 20;
+
+    let idx = parseInt(localStorage.getItem(KEY_IDX) ?? "0", 10);
+    if (Number.isNaN(idx)) idx = 0;
+
+    let blurPx = parseInt(localStorage.getItem(KEY_BLUR) ?? `${START_BLUR}`, 10);
+    if (Number.isNaN(blurPx)) blurPx = START_BLUR;
+
+    if (idx === 0) {
+      blurPx = START_BLUR;
+      localStorage.setItem(KEY_BLUR, String(START_BLUR));
+    }
+
+    const img = document.getElementById('map-img');
+    const qText = document.getElementById('q-text');
+    const qProg = document.getElementById('q-progress');
+    const input = document.getElementById('answer');
+    const btn = document.getElementById('send-btn');
+    const status = document.getElementById('status');
+    const resetBtn = document.getElementById('reset-btn');
+
+    function applyBlur() {
+      const clamped = Math.max(0, Math.min(START_BLUR, blurPx));
+      img.style.filter = `blur(${clamped}px)`;
+    }
+    applyBlur();
+
+    function render() {
+      if (idx >= RIDDLES.length) {
+        qProg.textContent = "Hotovo 🎉";
+        qText.textContent = "Vyřešil(a) jsi všechny hádanky!";
+        input.disabled = true;
+        btn.disabled = true;
+        status.innerHTML = "<span class='ok'>Skvělé!</span>";
+        return;
+      }
+      qProg.textContent = `Otázka ${idx + 1}/${RIDDLES.length}`;
+      qText.textContent = RIDDLES[idx].q;
+      status.textContent = "";
+      input.value = "";
+      input.focus();
+    }
+    render();
+
+    const norm = s => s.trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    function check() {
+      if (idx >= RIDDLES.length) return;
+      const user = norm(input.value);
+      const ok = RIDDLES[idx].a.some(ans => user === norm(ans));
+      if (ok) {
+        blurPx = Math.max(0, blurPx - STEP);
+        idx += 1;
+        localStorage.setItem(KEY_BLUR, String(blurPx));
+        localStorage.setItem(KEY_IDX, String(idx));
+        location.reload();  
+      } else {
+        status.innerHTML = "<span class='bad'>Špatná odpověď, zkus to znovu.</span>";
+      }
+    }
+
+    btn.addEventListener('click', check);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
+
+    resetBtn.addEventListener('click', () => {
+      localStorage.removeItem(KEY_IDX);
+      localStorage.removeItem(KEY_BLUR);
+      location.reload();
+    });
   </script>
 </body>
 </html>
