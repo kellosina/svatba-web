@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mapa pokladu část první!</title>
+  <link rel="stylesheet" href="styl.css">
+</head>
+<body data-page="mapa1">
+  <h1>🗺️ Mapa pokladu část první!</h1>
+
+  <div class="wrap">
+    <div class="map-frame">
+      <img id="map-img" src="map.png" alt="Mapa pokladu">
+    </div>
+
+    <p class="under-map">🔍 Víte kde to je?</p>
+
+    <div class="card">
+      <div class="q-head" id="q-progress">Otázka</div>
+      <p class="q-text" id="q-text"></p>
+      <div class="meta">Zadej odpověď (bez ohledu na diakritiku a velikost písmen).</div>
+
+      <form id="riddle-form" class="row">
+        <input id="answer" type="text" placeholder="Napiš odpověď…" autocomplete="off">
+        <button id="send-btn" type="submit">Odeslat</button>
+      </form>
+
+      <div class="status" id="status"></div>
+
+      <div class="controls">
+        <button id="reset-btn" class="ghost-btn" type="button" title="Začít znovu">Resetovat postup</button>
+        <a id="next-map" class="link-btn" href="mapa2.html" style="display:none;">➡️ Pokračovat na další mapu</a>
+      </div>
+    </div>
+  </div>
+
+  <noscript>Pro tento úkol je potřeba povolit JavaScript.</noscript>
+  <script src="script.js"></script>
+</body>
+</html>
